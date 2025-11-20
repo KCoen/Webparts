@@ -39,6 +39,16 @@ shaderParticles.prototype.initGL = function()
 	gl.bindFramebuffer(gl.FRAMEBUFFER, this.rttFramebuffer);
 	this.rttFramebuffer.width = 4096;
 	this.rttFramebuffer.height = 4096;
+
+	this.proxyTexture = gl.createTexture(); // WebGL spec change to disallow simultanious reading/rendering to the framebuffer.
+	gl.bindTexture(gl.TEXTURE_2D, this.proxyTexture);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+	
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+	
+	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, this.rttFramebuffer.width, this.rttFramebuffer.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
 	
 	this.rttTexture = gl.createTexture();
 	gl.bindTexture(gl.TEXTURE_2D, this.rttTexture);
@@ -49,6 +59,8 @@ shaderParticles.prototype.initGL = function()
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 	
 	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, this.rttFramebuffer.width, this.rttFramebuffer.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+
+
 	
 	this.renderbuffer = gl.createRenderbuffer();
     gl.bindRenderbuffer(gl.RENDERBUFFER, this.renderbuffer);
@@ -112,19 +124,27 @@ shaderParticles.prototype.draw = function()
 	gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
 	gl.vertexAttribPointer(this.vertexPositionAttribute, 4, gl.FLOAT, false, 0, 0);
 	
-	
-	
 	gl.uniformMatrix4fv(this.pMatrixUniform, false, this.pMatrix);
 	gl.uniformMatrix4fv(this.uAttractorsUniform, false, this.attractors);
 	
 	gl.activeTexture(gl.TEXTURE0);
-	gl.bindTexture(gl.TEXTURE_2D, this.rttTexture);
+	gl.bindTexture(gl.TEXTURE_2D, this.proxyTexture);
 	gl.uniform1i(this.samplerUniform, 0);
 	gl.uniform1i(this.callCountUniform, this.callCount);
 	
 	gl.drawArrays(gl.POINT, 0, this.C.particleCount);
 	
 	this.callCount = this.callCount + 1;
+
+	gl.bindTexture(gl.TEXTURE_2D, this.proxyTexture)
+	gl.copyTexSubImage2D(
+	    gl.TEXTURE_2D,
+	    0,        // mip level
+	    0, 0,     // dst x,y
+	    0, 0,     // src x,y
+	    this.rttFramebuffer.width,
+	    this.rttFramebuffer.height
+	);
 	
 	gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 }
